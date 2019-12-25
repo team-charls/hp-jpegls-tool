@@ -8,8 +8,6 @@
 #include <sstream>
 #include <fstream>
 
-namespace charls_test {
-
 // Purpose: this class can read an image stored in the Portable Anymap Format (PNM).
 //          The 2 binary formats P5 and P6 are supported:
 //          Portable GrayMap: P5 = binary, extension = .pgm, 0-2^16 (gray scale)
@@ -21,8 +19,8 @@ public:
     explicit portable_anymap_file(const char* filename)
     {
         std::ifstream pnm_file;
-        pnm_file.exceptions(std::ifstream::eofbit | std::ifstream::failbit | std::ifstream::badbit);
-        pnm_file.open(filename, std::ifstream::in | std::ifstream::binary);
+        pnm_file.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
+        pnm_file.open(filename, std::ios::in | std::ios::binary);
 
         std::vector<int> header_info = read_header(pnm_file);
         if (header_info.size() != 4)
@@ -60,27 +58,25 @@ public:
         return bits_per_sample_;
     }
 
-    std::vector<uint8_t>& image_data() noexcept
+    std::vector<std::byte>& image_data() noexcept
     {
         return input_buffer_;
     }
 
-    const std::vector<uint8_t>& image_data() const noexcept
+    const std::vector<std::byte>& image_data() const noexcept
     {
         return input_buffer_;
     }
 
-    static void save(int width, int height, int component_count, int alphabet, const std::vector<uint8_t>& image_data, const char* filename)
+    static void save(int width, int height, int component_count, int alphabet, const std::vector<std::byte>& image_data, const char* filename)
     {
-        std::ofstream pnm_file;
-        pnm_file.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
-        pnm_file.open(filename, std::ios::out | std::ios::binary);
+        std::ofstream output;
+        output.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
+        output.open(filename, std::ios::out | std::ios::binary);
 
-        pnm_file.put('P');
-        pnm_file.put('5');
-        pnm_file << '\n' << width << ' ' << height << '\n';
-        pnm_file << alphabet -1 << '\n';
-        pnm_file.write(reinterpret_cast<const char*>(image_data.data()), image_data.size());
+        const int component_count_id = component_count == 3 ? 6 : 5;
+        output << 'P' << component_count_id << '\n' << width << ' ' << height << '\n' << alphabet - 1 << '\n';
+        output.write(reinterpret_cast<const char*>(image_data.data()), image_data.size());
     }
 
 private:
@@ -139,7 +135,5 @@ private:
     int width_;
     int height_;
     int bits_per_sample_;
-    std::vector<uint8_t> input_buffer_;
+    std::vector<std::byte> input_buffer_;
 };
-
-} // namespace charls_test

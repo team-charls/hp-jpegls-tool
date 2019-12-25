@@ -11,6 +11,7 @@
 #include <sstream>
 #include <fstream>
 #include <algorithm>
+#include <filesystem>
 
 using std::ios;
 using std::ios_base;
@@ -21,6 +22,7 @@ using std::stringstream;
 using std::string;
 using std::ifstream;
 using std::byte;
+using namespace std::string_literals;
 
 const ios::openmode mode_input = ios::in | ios::binary;
 const ios::openmode mode_output = ios::out | ios::binary;
@@ -59,7 +61,7 @@ uint ReadBufCallback(void* context, ubyte* buffer, uint len)
 
 struct destination_context_t final
 {
-    vector<uint8_t> buffer_;
+    vector<byte> buffer_;
     size_t position_{};
 
     bool write(const ubyte* buffer, uint length)
@@ -141,7 +143,7 @@ bool encode_pnm(istream& pnm_source, const ostream& jls_destination)
     //params.colorTransformation = charls::ColorTransformation::HP2;
 
     const int bytesPerSample = (bitsPerSample + 7) / 8;
-    vector<uint8_t> inputBuffer(static_cast<size_t>(jpegls_info.width) * jpegls_info.height * bytesPerSample * jpegls_info.components);
+    vector<uint8_t> inputBuffer(static_cast<size_t>(jpegls_info.width)* jpegls_info.height* bytesPerSample* jpegls_info.components);
     pnm_source.read(reinterpret_cast<char*>(inputBuffer.data()), inputBuffer.size());
     if (!pnm_source.good())
         return false;
@@ -200,12 +202,21 @@ vector<byte> read_file(const char* filename)
     return buffer;
 }
 
+void save_file(const std::vector<byte>& data, const char* filename)
+{
+    std::ofstream output;
+    output.exceptions(ios::eofbit | ios::failbit | ios::badbit);
+    output.open(filename, ios::out | ios::binary);
+
+    output.write(reinterpret_cast<const char*>(data.data()), data.size());
+}
+
 
 class source_context_t2 final
 {
 public:
     explicit source_context_t2(vector<byte> buffer) :
-        buffer_{move(buffer)}
+        buffer_{ move(buffer) }
     {
     }
 
@@ -237,13 +248,50 @@ size_t bytes_per_sample(const uint alphabet)
     return alphabet > 256 ? 2 : 1;
 }
 
+size_t estimated_encoded_size(const int width, const int height, const int component_count, const int bits_per_sample)
+{
+    return static_cast<size_t>(width)* height*
+        component_count* (bits_per_sample < 9 ? 1 : 2) + 1024;
+}
+
+
+void encode(const char* source_filename, const char* destination_filename)
+{
+    portable_anymap_file anymap_file{ source_filename };
+
+    JPEGLS* codec = JPEGLS_Create();
+
+    JPEGLS_Info jpegls_info;
+    JPEGLS_GetDefaultInfo(&jpegls_info);
+    jpegls_info.width = anymap_file.width();
+    jpegls_info.height = anymap_file.height();
+    jpegls_info.components = anymap_file.component_count();
+    jpegls_info.scan[0].components = anymap_file.component_count();
+
+    destination_context_t destination_context;
+    destination_context.buffer_.resize(estimated_encoded_size(jpegls_info.width,
+        jpegls_info.height, anymap_file.component_count(), anymap_file.bits_per_sample()));
+
+    bool result = JPEGLS_StartEncode(codec, WriteBufCallback, &destination_context, &jpegls_info);
+    if (!result)
+        throw std::exception("JPEGLS_StartEncode");
+
+    source_context_t2 source_context{ anymap_file.image_data() };
+    result = JPEGLS_EncodeFromCB(codec, read_buffer_callback, &source_context);
+    if (!result)
+        throw std::exception("JPEGLS_EncodeFromCB");
+
+    destination_context.buffer_.resize(destination_context.position_);
+    save_file(destination_context.buffer_, destination_filename);
+}
+
 void decode(const char* source_filename, const char* destination_filename)
 {
     vector<byte> source = read_file(source_filename);
 
     JPEGLS* codec = JPEGLS_Create();
 
-    source_context_t2 source_context{move(source)};
+    source_context_t2 source_context{ move(source) };
     bool result = JPEGLS_StartDecode(codec, read_buffer_callback, &source_context);
     if (!result)
         throw std::exception("JPEGLS_StartDecode failed");
@@ -263,22 +311,32 @@ void decode(const char* source_filename, const char* destination_filename)
 
     JPEGLS_Destroy(codec);
 
-    charls_test::portable_anymap_file::save(jpegls_info.width, jpegls_info.height,
+    portable_anymap_file::save(jpegls_info.width, jpegls_info.height,
         jpegls_info.components, jpegls_info.alphabet, destination_context.buffer_, destination_filename);
 }
 
 
 int main(const int argc, const char* const argv[])
 {
-    if (argc < 3)
+    if (argc < 4)
     {
-        std::cout << "usage: hp-jpegls-test <input> <output>\n";
+        std::cout << "usage: hp-jpegls-test <operation (encode | decode> <input> <output>\n";
         return EXIT_FAILURE;
     }
 
-    decode(argv[1], argv[2]);
-
-    //std::fstream pnm_source("input.ppm", mode_input);
-    //const std::fstream jls_destination("output.jls", mode_output);
-    //encode_pnm(pnm_source, jls_destination);
+    if (argv[1] == "encode"s)
+    {
+        encode(argv[2], argv[3]);
+    }
+    else
+    {
+        if (argv[1] == "decode"s)
+        {
+            decode(argv[2], argv[3]);
+        }
+        else
+        {
+            std::cout << "Unknown operation: " << argv[1] << '\n';
+        }
+    }
 }
