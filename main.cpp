@@ -3,7 +3,7 @@
 
 #include "portable_anymap_file.h"
 
-#include "hp/jpeglsdll.h"
+#include "hp/jpegls.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -23,47 +23,6 @@ using std::stringstream;
 using std::vector;
 using namespace std::string_literals;
 
-namespace hp {
-
-class jpegls_codec final
-{
-public:
-    jpegls_codec()
-    {
-        JPEGLS_SetMessageCallback(get(), message_callback, this);
-    }
-
-    [[nodiscard]] JPEGLS* get() const
-    {
-        return codec_.get();
-    }
-
-private:
-    [[nodiscard]] static JPEGLS* create_codec()
-    {
-        JPEGLS* codec = JPEGLS_Create();
-        if (!codec)
-            throw std::bad_alloc();
-
-        return codec;
-    }
-
-    static void destroy_codec(JPEGLS* codec) noexcept
-    {
-        JPEGLS_Destroy(codec);
-    }
-
-    static void message_callback(void* context, const char* message)
-    {
-        auto this_pointer = static_cast<jpegls_codec*>(context);
-        this_pointer->last_message_ = message;
-    }
-
-    std::string last_message_;
-    std::unique_ptr<JPEGLS, void (*)(JPEGLS*)> codec_{create_codec(), destroy_codec};
-};
-
-} // namespace hp
 
 namespace {
 
@@ -102,13 +61,14 @@ struct destination_context_t final
     vector<byte> buffer_;
     size_t position_{};
 
-    bool write(const ubyte* buffer, uint length)
+    bool write(const ubyte* buffer, const uint length)
     {
         if (length > buffer_.size() - position_)
             return false;
 
         memcpy(&buffer_[position_], buffer, length);
         position_ += length;
+
         return true;
     }
 };
@@ -116,6 +76,9 @@ struct destination_context_t final
 
 BOOL write_buffer_callback(void* context, const ubyte* buffer, const uint length)
 {
+    if (length == 0)
+        return TRUE; // Note: calling JPEGLS_Destroy may call callback with 0 bytes.
+
     auto destination_context = static_cast<destination_context_t*>(context);
 
     return static_cast<BOOL>(destination_context->write(buffer, length));
@@ -170,17 +133,16 @@ void encode(const char* source_filename, const char* destination_filename)
     jpegls_info.height = anymap_file.height();
     jpegls_info.components = anymap_file.component_count();
     jpegls_info.scan[0].components = anymap_file.component_count();
+    jpegls_info.scan[0].interleave = INTERLEAVE_NONE;
 
     destination_context_t destination_context;
     destination_context.buffer_.resize(estimated_encoded_size(jpegls_info.width,
                                                               jpegls_info.height, anymap_file.component_count(), anymap_file.bits_per_sample()));
 
-    bool result = JPEGLS_StartEncode(codec.get(), write_buffer_callback, &destination_context, &jpegls_info);
-    if (!result)
-        throw std::exception("JPEGLS_StartEncode");
+    codec.start_encode(write_buffer_callback, &destination_context, jpegls_info);
 
     source_context_t source_context{anymap_file.image_data()};
-    result = JPEGLS_EncodeFromCB(codec.get(), read_buffer_callback, &source_context);
+    const bool result = JPEGLS_EncodeFromCB(codec.get(), read_buffer_callback, &source_context);
     if (!result)
         throw std::exception("JPEGLS_EncodeFromCB");
 
@@ -195,22 +157,15 @@ void decode(const char* source_filename, const char* destination_filename)
     const hp::jpegls_codec codec;
 
     source_context_t source_context{move(source)};
-    bool result = JPEGLS_StartDecode(codec.get(), read_buffer_callback, &source_context);
-    if (!result)
-        throw std::exception("JPEGLS_StartDecode failed");
+    codec.start_decode(read_buffer_callback, &source_context);
 
-    JPEGLS_Info jpegls_info;
-    result = JPEGLS_GetInfo(codec.get(), &jpegls_info);
-    if (!result)
-        throw std::exception("JPEGLS_GetInfo failed");
+    const JPEGLS_Info jpegls_info{codec.get_info()};
 
     const size_t destination_size = jpegls_info.width * jpegls_info.height * jpegls_info.components * bytes_per_sample(jpegls_info.alphabet);
     destination_context_t destination_context;
     destination_context.buffer_.resize(destination_size);
 
-    result = JPEGLS_DecodeToCB(codec.get(), write_buffer_callback, &destination_context);
-    if (!result)
-        throw std::exception("JPEGLS_DecodeToCB failed");
+    codec.decode(write_buffer_callback, &destination_context);
 
     portable_anymap_file::save(jpegls_info.width, jpegls_info.height,
                                jpegls_info.components, jpegls_info.alphabet, destination_context.buffer_, destination_filename);
