@@ -1,177 +1,170 @@
 // Copyright (c) HEWLETT-PACKARD
 // License details can be found in: HP_ LICENSE.txt
 
-#ifndef JPEGLSLIB_H
-#define JPEGLSLIB_H
+#pragma once
 
-extern "C"
-{
+#include <cstdint>
+#include <cstddef>
+
+namespace hp {
 
 //---------------------------------------------
 // the (opaque) JPEGLS module
 
-typedef struct JPEGLS JPEGLS;
+struct JPEGLS;
 
 //---------------------------------------------
 // base types
 
-typedef unsigned long	ulong;
-typedef unsigned short	uword;
-typedef unsigned char	ubyte;
-typedef unsigned int 	uint;
-
-typedef unsigned short	pixel;	// int is faster; short for less memory
-
-typedef enum
+enum class BOOL
 {
-	FALSE=0,
-	TRUE=1
-} BOOL;
+    FALSE = 0,
+    TRUE = 1
+};
 
 
-typedef void	(*JPEGLS_MessageCallback)	(void * context,const char *message);
+typedef void (*JPEGLS_MessageCallback)(void* context, const char* message);
 
-typedef uint	(*JPEGLS_ReadBufCallback)	(void * context,      ubyte * buffer,uint len);
-typedef BOOL	(*JPEGLS_WriteBufCallback)	(void * context,const ubyte * buffer,uint len);
+typedef uint32_t (*JPEGLS_ReadBufCallback)(void* context, std::byte* buffer, uint32_t len);
+typedef BOOL (*JPEGLS_WriteBufCallback)(void* context, const std::byte* buffer, uint32_t len);
 
 //---------------------------------------------
 // the Info structures
 
-#define MAX_COMPONENTS	(8)
-#define MAX_SCANS		(4)
+constexpr auto MAX_COMPONENTS = 8;
+constexpr auto MAX_SCANS = 4;
 
-typedef enum
+enum class JPEGLS_Interleave
 {
-	INTERLEAVE_PLANE	=0,
-	INTERLEAVE_NONE		= INTERLEAVE_PLANE,
-	INTERLEAVE_LINE		=1,
-	INTERLEAVE_PIXEL	=2,
-	INTERLEAVE_COUNT	=3
-} JPEGLS_Interleave;
+    plane = 0,
+    none = plane,
+    line = 1,
+    pixel = 2,
+};
 
-typedef enum
+enum class JPEGLS_ColorSpace
 {
-	COLORSPACE_NONE = 0, // means don't transmit to decoder
+    NONE = 0, // means don't transmit to decoder
 
-	COLORSPACE_GRAY,
-	COLORSPACE_PALETTIZED,
-	COLORSPACE_RGB,
-	COLORSPACE_YUV,
-	COLORSPACE_HSV,
-	COLORSPACE_HSB, COLORSPACE_HSL,
-	COLORSPACE_LAB, COLORSPACE_CMYK,
-	COLORSPACE_COUNT
-} JPEGLS_ColorSpace;
+    GRAY,
+    PALETTIZED,
+    RGB,
+    YUV,
+    HSV,
+    HSB,
+    HSL,
+    LAB,
+    CMYK,
+};
 
-typedef enum
+enum class JPEGLS_ColorXForm
 {
-	COLORXFORM_NONE = 0,  // means don't transmit to decoder
+    NONE = 0, // means don't transmit to decoder
 
-	COLORXFORM_HP1,
-	COLORXFORM_HP2,
-	COLORXFORM_HP3,
-	COLORXFORM_RGB_AS_YUV_LOSSY,
+    HP1,
+    HP2,
+    HP3,
+    RGB_AS_YUV_LOSSY,
 
-	COLORXFORM_MATRIX,			// if you set this at encode time, you must
-							// specify a colorMatrixForward & colorMatrixInverse
-							// color inverse matrix must have diagonal ones!
+    MATRIX, // if you set this at encode time, you must
+            // specify a colorMatrixForward & colorMatrixInverse
+            // color inverse matrix must have diagonal ones!
+};
 
-	COLORXFORM_COUNT
+// the colorspaces are *not* in the JPEG-LS standard
+// most of these are just information communication
+// from the encoder to the decoder
+// the _AS_ values tell my code to do an xform at enc & dec
 
-} JPEGLS_ColorXForm;
-	// the colorspaces are *not* in the JPEG-LS standard
-	//	most of these are just information communication
-	//	from the encoder to the decoder
-	// the _AS_ values tell my code to do an xform at enc & dec
-
-typedef struct JPEGLS_ScanInfo
+struct JPEGLS_ScanInfo final
 {
-	JPEGLS_Interleave interleave;
+    JPEGLS_Interleave interleave;
 
-	uint loss,shift;
-	uint thresholds[3];
-	uint resetCount;
+    uint32_t loss;
+    uint32_t shift;
+    uint32_t thresholds[3];
+    uint32_t resetCount;
 
-	JPEGLS_ColorSpace colorSpace;
+    JPEGLS_ColorSpace colorSpace;
 
-	// optional colorXform stuff:
-	JPEGLS_ColorXForm colorXForm;			// the matrices only exist if xform == MATRIX
-	int colorMatrixForward[MAX_COMPONENTS][MAX_COMPONENTS];
-											// the forward matrix is a real matrix, left-shifted 16
-											// (encoder only)
-	int colorMatrixInverse[MAX_COMPONENTS][MAX_COMPONENTS];
-	BOOL colorMatrixDC[MAX_COMPONENTS];		// ACDC flag (eg. DC means you've changed the average to zero)
-	uint colorMatrixBits[MAX_COMPONENTS];	// Value = Matrix[row][col] >> Bits
-											// DC and Bits are per-row
+    // optional colorXform stuff:
+    JPEGLS_ColorXForm colorXForm; // the matrices only exist if xform == MATRIX
+    int colorMatrixForward[MAX_COMPONENTS][MAX_COMPONENTS];
 
-	// stuff that's repeated from the main info :
-	uint alphabet;
-	uint components;
-	uint componentId[MAX_COMPONENTS];
+    // the forward matrix is a real matrix, left-shifted 16
+    // (encoder only)
+    int colorMatrixInverse[MAX_COMPONENTS][MAX_COMPONENTS];
+    BOOL colorMatrixDC[MAX_COMPONENTS];   // ACDC flag (eg. DC means you've changed the average to zero)
+    uint32_t colorMatrixBits[MAX_COMPONENTS]; // Value = Matrix[row][col] >> Bits
+                                          // DC and Bits are per-row
 
-	// the JPEGLS spec allows for multiple tables, but we just allow one :
+    // stuff that's repeated from the main info :
+    uint32_t alphabet;
+    uint32_t components;
+    uint32_t componentId[MAX_COMPONENTS];
 
-	BOOL hasTable;
-	uint tableSize,tableEntryWidth;	// this stuff only exists if hasTable is true
-    ulong mapTable[256];
+    // the JPEGLS spec allows for multiple tables, but we just allow one :
 
-} JPEGLS_ScanInfo;
+    BOOL hasTable;
+    uint32_t tableSize, tableEntryWidth; // this stuff only exists if hasTable is true
+    uint32_t mapTable[256];
+};
 
-typedef struct JPEGLS_Info
+struct JPEGLS_Info final
 {
-	uint width,height;
-	uint alphabet,components;
+    uint32_t width;
+    uint32_t height;
+    uint32_t alphabet;
+    uint32_t components;
 
-	BOOL doRestart;
-	uint restartInterval;
+    BOOL doRestart;
+    uint32_t restartInterval;
 
-	uint samplingX[MAX_COMPONENTS],
-		samplingY[MAX_COMPONENTS],
-		componentId[MAX_COMPONENTS]; // we read & write these, but do nothing with them
+    uint32_t samplingX[MAX_COMPONENTS];
+    uint32_t samplingY[MAX_COMPONENTS];
+    uint32_t componentId[MAX_COMPONENTS]; // we read & write these, but do nothing with them
 
-	uint	scanCount;
-	JPEGLS_ScanInfo scan[MAX_SCANS];
+    uint32_t scanCount;
+    JPEGLS_ScanInfo scan[MAX_SCANS];
+};
 
-} JPEGLS_Info;
-
-//----------------------------------------------------------
-// the function import style
-
-#define JPEGLSCC	_declspec(dllimport)
 
 //---------------------------------------------
 // the library functions
 
-JPEGLSCC	JPEGLS * JPEGLS_Create(void);
+extern "C" {
 
-JPEGLSCC	void JPEGLS_Destroy(JPEGLS * j);
+__declspec(dllimport) JPEGLS* JPEGLS_Create(void);
 
-JPEGLSCC	BOOL JPEGLS_CheckOk(JPEGLS * j);
+__declspec(dllimport) void JPEGLS_Destroy(JPEGLS* j);
 
-JPEGLSCC	void JPEGLS_SetMessageCallback(JPEGLS * j,JPEGLS_MessageCallback mcb,void * messageContext);
+__declspec(dllimport) BOOL JPEGLS_CheckOk(JPEGLS* j);
 
-JPEGLSCC	BOOL JPEGLS_GetInfo(const JPEGLS * j,JPEGLS_Info *jinfo);
-						// can only GetInfo after StartDecode
-JPEGLSCC	void JPEGLS_GetDefaultInfo(JPEGLS_Info *jinfo);
+__declspec(dllimport) void JPEGLS_SetMessageCallback(JPEGLS* j, JPEGLS_MessageCallback mcb, void* messageContext);
 
-JPEGLSCC	BOOL JPEGLS_IsStreamJLS(JPEGLS_ReadBufCallback rcb,void * readContext);
-						// test to see if a file is JLS file
-						// note : we may read & not seek back! you must do any seek-backing you want
+__declspec(dllimport) BOOL JPEGLS_GetInfo(const JPEGLS* j, JPEGLS_Info* jinfo);
+// can only GetInfo after StartDecode
 
-JPEGLSCC	BOOL JPEGLS_StartDecode(JPEGLS * j, JPEGLS_ReadBufCallback rcb,void * readContext );
-JPEGLSCC	BOOL JPEGLS_StartEncode(JPEGLS * j,JPEGLS_WriteBufCallback wcb,void * writeContext,const JPEGLS_Info *jinfo);
+__declspec(dllimport) void JPEGLS_GetDefaultInfo(JPEGLS_Info* jinfo);
 
-JPEGLSCC	void * JPEGLS_GetEncodeLine(JPEGLS * j);
-					// gives you a line to work into and then pass to EncodeLine()
-					// you must re-call this after each EncodeLine
+__declspec(dllimport) BOOL JPEGLS_IsStreamJLS(JPEGLS_ReadBufCallback rcb, void* readContext);
+// test to see if a file is JLS file
+// note : we may read & not seek back! you must do any seek-backing you want
 
-JPEGLSCC	BOOL JPEGLS_EncodeLine8b (JPEGLS * j,ubyte * line);
-JPEGLSCC	BOOL JPEGLS_EncodeLine16b(JPEGLS * j,uword * line);
+__declspec(dllimport) BOOL JPEGLS_StartDecode(JPEGLS* j, JPEGLS_ReadBufCallback rcb, void* readContext);
+__declspec(dllimport) BOOL JPEGLS_StartEncode(JPEGLS* j, JPEGLS_WriteBufCallback wcb, void* writeContext, const JPEGLS_Info* jinfo);
 
-JPEGLSCC	BOOL JPEGLS_DecodeLine8b (JPEGLS * j,ubyte ** pLine);
-JPEGLSCC	BOOL JPEGLS_DecodeLine16b(JPEGLS * j,uword ** pLine);
-						// the decode functions give you a pointer to a line which is
-						//	valid only until any other JPEGLS function is called!
+__declspec(dllimport) void* JPEGLS_GetEncodeLine(JPEGLS* j);
+// gives you a line to work into and then pass to EncodeLine()
+// you must re-call this after each EncodeLine
+
+__declspec(dllimport) BOOL JPEGLS_EncodeLine8b(JPEGLS* j, std::byte* line);
+__declspec(dllimport) BOOL JPEGLS_EncodeLine16b(JPEGLS* j, uint16_t* line);
+
+__declspec(dllimport) BOOL JPEGLS_DecodeLine8b(JPEGLS* j, std::byte** pLine);
+__declspec(dllimport) BOOL JPEGLS_DecodeLine16b(JPEGLS* j, uint16_t** pLine);
+// the decode functions give you a pointer to a line which is
+// valid only until any other JPEGLS function is called!
 
 /****
  notes on the CodeLine functions:
@@ -186,20 +179,13 @@ JPEGLSCC	BOOL JPEGLS_DecodeLine16b(JPEGLS * j,uword ** pLine);
 		B. you must get a new line for every scan line! the pointer is *not* persistent!
 ****/
 
-JPEGLSCC	BOOL JPEGLS_EncodeFromCB (JPEGLS * j,JPEGLS_ReadBufCallback  rcb,void *rcbContext);
-JPEGLSCC	BOOL JPEGLS_DecodeToCB   (JPEGLS * j,JPEGLS_WriteBufCallback wcb,void *wcbContext);
-						// from a DLL, you should use these instead of CodeLine, for speed
-						// does 8b or 16b as appropriate
+__declspec(dllimport) BOOL JPEGLS_EncodeFromCB(JPEGLS* j, JPEGLS_ReadBufCallback rcb, void* rcbContext);
+__declspec(dllimport) BOOL JPEGLS_DecodeToCB(JPEGLS* j, JPEGLS_WriteBufCallback wcb, void* wcbContext);
+// from a DLL, you should use these instead of CodeLine, for speed
+// does 8b or 16b as appropriate
 
-JPEGLSCC
-	const char * JPEGLS_GetInterleaveDescription(JPEGLS_Interleave interleave);
-JPEGLSCC
-	const char * JPEGLS_GetColorXFormDescription(JPEGLS_ColorXForm xf);
-JPEGLSCC
-	const char * JPEGLS_GetColorSpaceDescription(JPEGLS_ColorSpace s);
-
-//---------------------------------------------
-
+__declspec(dllimport) const char* JPEGLS_GetInterleaveDescription(JPEGLS_Interleave interleave);
+__declspec(dllimport) const char* JPEGLS_GetColorXFormDescription(JPEGLS_ColorXForm xf);
+__declspec(dllimport) const char* JPEGLS_GetColorSpaceDescription(JPEGLS_ColorSpace s);
 }
-#endif // JPEGLS_H
-
+} // namespace hp

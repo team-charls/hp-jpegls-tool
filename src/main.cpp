@@ -15,6 +15,7 @@
 #include <vector>
 
 using std::byte;
+using std::cout;
 using std::exception;
 using std::ifstream;
 using std::ios;
@@ -24,19 +25,19 @@ using std::string;
 using std::stringstream;
 using std::vector;
 using namespace std::string_literals;
-
+using namespace hp;
 
 namespace {
 
 class source_context_t final
 {
 public:
-    explicit source_context_t(vector<byte> buffer) noexcept:
+    explicit source_context_t(vector<byte> buffer) noexcept :
         buffer_{move(buffer)}
     {
     }
 
-    uint read(ubyte* buffer, const uint length) noexcept
+    uint32_t read(byte* buffer, const uint32_t length) noexcept
     {
         const size_t bytes_to_copy = std::min(length, buffer_.size() - position_);
 
@@ -51,7 +52,7 @@ private:
     size_t position_{};
 };
 
-uint read_buffer_callback(void* context, ubyte* buffer, const uint length) noexcept
+uint32_t read_buffer_callback(void* context, byte* buffer, const uint32_t length) noexcept
 {
     auto source_context = static_cast<source_context_t*>(context);
 
@@ -63,7 +64,7 @@ struct destination_context_t final
     vector<byte> buffer_;
     size_t position_{};
 
-    bool write(const ubyte* buffer, const uint length) noexcept
+    bool write(const byte* buffer, const uint32_t length) noexcept
     {
         if (length > buffer_.size() - position_)
             return false;
@@ -75,11 +76,10 @@ struct destination_context_t final
     }
 };
 
-
-BOOL write_buffer_callback(void* context, const ubyte* buffer, const uint length) noexcept
+BOOL write_buffer_callback(void* context, const byte* buffer, const uint32_t length) noexcept
 {
     if (length == 0)
-        return TRUE; // Note: calling JPEGLS_Destroy may call callback with 0 bytes.
+        return static_cast<BOOL>(true); // Note: calling JPEGLS_Destroy may call callback with 0 bytes.
 
     auto destination_context = static_cast<destination_context_t*>(context);
 
@@ -111,7 +111,7 @@ void save_file(const std::vector<byte>& data, const char* filename)
     output.write(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
-constexpr size_t bytes_per_sample(const uint alphabet) noexcept
+constexpr size_t bytes_per_sample(const uint32_t alphabet) noexcept
 {
     return alphabet > 256 ? 2 : 1;
 }
@@ -127,7 +127,7 @@ void encode(const char* source_filename, const char* destination_filename)
 {
     portable_anymap_file anymap_file{source_filename};
 
-    const hp::jpegls_codec codec;
+    const jpegls_codec codec;
 
     JPEGLS_Info jpegls_info;
     JPEGLS_GetDefaultInfo(&jpegls_info);
@@ -135,7 +135,7 @@ void encode(const char* source_filename, const char* destination_filename)
     jpegls_info.height = anymap_file.height();
     jpegls_info.components = anymap_file.component_count();
     jpegls_info.scan[0].components = anymap_file.component_count();
-    jpegls_info.scan[0].interleave = INTERLEAVE_NONE;
+    jpegls_info.scan[0].interleave = JPEGLS_Interleave::none;
 
     destination_context_t destination_context;
     destination_context.buffer_.resize(estimated_encoded_size(jpegls_info.width,
@@ -156,7 +156,7 @@ void decode(const char* source_filename, const char* destination_filename)
 {
     vector<byte> source = read_file(source_filename);
 
-    const hp::jpegls_codec codec;
+    const jpegls_codec codec;
 
     source_context_t source_context{move(source)};
     codec.start_decode(read_buffer_callback, &source_context);
@@ -181,7 +181,7 @@ int main(const int argc, const char* const argv[])
     {
         if (argc < 4)
         {
-            std::cout << "usage: hp-jpegls-test <operation (encode | decode> <input> <output>\n";
+            cout << "usage: hp-jpegls-test <operation (encode | decode> <input> <output>\n";
             return EXIT_FAILURE;
         }
 
@@ -197,12 +197,12 @@ int main(const int argc, const char* const argv[])
             }
             else
             {
-                std::cout << "Unknown operation: " << argv[1] << '\n';
+                cout << "Unknown operation: " << argv[1] << '\n';
             }
         }
     }
     catch (const exception& error)
     {
-        std::cout << "Unexpected failure: " << error.what() << '\n';
+        cout << "Unexpected failure: " << error.what() << '\n';
     }
 }
