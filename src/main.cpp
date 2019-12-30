@@ -3,7 +3,7 @@
 
 #include "portable_anymap_file.h"
 
-#include "hp/jpegls.h"
+#include <hp/jpegls.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -29,12 +29,12 @@ namespace {
 class source_context_t final
 {
 public:
-    explicit source_context_t(vector<byte> buffer) :
+    explicit source_context_t(vector<byte> buffer) noexcept:
         buffer_{move(buffer)}
     {
     }
 
-    uint read(ubyte* buffer, const uint length)
+    uint read(ubyte* buffer, const uint length) noexcept
     {
         const size_t bytes_to_copy = std::min(length, buffer_.size() - position_);
 
@@ -49,7 +49,7 @@ private:
     size_t position_{};
 };
 
-uint read_buffer_callback(void* context, ubyte* buffer, const uint length)
+uint read_buffer_callback(void* context, ubyte* buffer, const uint length) noexcept
 {
     auto source_context = static_cast<source_context_t*>(context);
 
@@ -61,7 +61,7 @@ struct destination_context_t final
     vector<byte> buffer_;
     size_t position_{};
 
-    bool write(const ubyte* buffer, const uint length)
+    bool write(const ubyte* buffer, const uint length) noexcept
     {
         if (length > buffer_.size() - position_)
             return false;
@@ -74,7 +74,7 @@ struct destination_context_t final
 };
 
 
-BOOL write_buffer_callback(void* context, const ubyte* buffer, const uint length)
+BOOL write_buffer_callback(void* context, const ubyte* buffer, const uint length) noexcept
 {
     if (length == 0)
         return TRUE; // Note: calling JPEGLS_Destroy may call callback with 0 bytes.
@@ -109,12 +109,12 @@ void save_file(const std::vector<byte>& data, const char* filename)
     output.write(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
-size_t bytes_per_sample(const uint alphabet) noexcept
+constexpr size_t bytes_per_sample(const uint alphabet) noexcept
 {
     return alphabet > 256 ? 2 : 1;
 }
 
-size_t estimated_encoded_size(const int width, const int height, const int component_count, const int bits_per_sample)
+constexpr size_t estimated_encoded_size(const int width, const int height, const int component_count, const int bits_per_sample)
 {
     return static_cast<size_t>(width) * height *
                component_count * (bits_per_sample < 9 ? 1 : 2) +
@@ -142,7 +142,7 @@ void encode(const char* source_filename, const char* destination_filename)
     codec.start_encode(write_buffer_callback, &destination_context, jpegls_info);
 
     source_context_t source_context{anymap_file.image_data()};
-    const bool result = JPEGLS_EncodeFromCB(codec.get(), read_buffer_callback, &source_context);
+    const bool result = static_cast<bool>(JPEGLS_EncodeFromCB(codec.get(), read_buffer_callback, &source_context));
     if (!result)
         throw std::exception("JPEGLS_EncodeFromCB");
 

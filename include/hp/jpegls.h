@@ -11,21 +11,21 @@ namespace hp {
 class jpegls_codec final
 {
 public:
-    jpegls_codec()
+    jpegls_codec() noexcept(false)
     {
         JPEGLS_SetMessageCallback(get(), message_callback, this);
     }
 
     void start_decode(const JPEGLS_ReadBufCallback read_callback, void* context) const
     {
-        const bool result = JPEGLS_StartDecode(get(), read_callback, context);
+        const bool result = static_cast<bool>(JPEGLS_StartDecode(get(), read_callback, context));
         if (!result)
             throw std::exception(("JPEGLS_StartDecode failed: " + last_message_).c_str());
     }
 
     void start_encode(const JPEGLS_WriteBufCallback write_buffer_callback, void* context, const JPEGLS_Info& info) const
     {
-        const bool result = JPEGLS_StartEncode(get(), write_buffer_callback, context, &info);
+        const bool result = static_cast<bool>(JPEGLS_StartEncode(get(), write_buffer_callback, context, &info));
         if (!result)
             throw std::exception(("JPEGLS_StartEncode: " + last_message_).c_str());
     }
@@ -33,7 +33,7 @@ public:
     [[nodiscard]] JPEGLS_Info get_info() const
     {
         JPEGLS_Info jpegls_info;
-        const bool result = JPEGLS_GetInfo(get(), &jpegls_info);
+        const bool result = static_cast<bool>(JPEGLS_GetInfo(get(), &jpegls_info));
         if (!result)
             throw std::exception(("JPEGLS_GetInfo failed: " + last_message_).c_str());
 
@@ -42,19 +42,19 @@ public:
 
     void decode(const JPEGLS_WriteBufCallback write_buffer_callback, void* context) const
     {
-        const bool result = JPEGLS_DecodeToCB(get(), write_buffer_callback, context);
+        const bool result = static_cast<bool>(JPEGLS_DecodeToCB(get(), write_buffer_callback, context));
         if (!result)
             throw std::exception(("JPEGLS_DecodeToCB failed: " + last_message_).c_str());
     }
 
     void encode(JPEGLS_ReadBufCallback read_buffer_callback, void* context) const
     {
-        const bool result = JPEGLS_EncodeFromCB(get(), read_buffer_callback, context);
+        const bool result = static_cast<bool>(JPEGLS_EncodeFromCB(get(), read_buffer_callback, context));
         if (!result)
             throw std::exception(("JPEGLS_EncodeFromCB: " + last_message_).c_str());
     }
 
-    [[nodiscard]] JPEGLS* get() const
+    [[nodiscard]] JPEGLS* get() const noexcept
     {
         return codec_.get();
     }
