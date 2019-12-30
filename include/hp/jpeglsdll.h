@@ -1,6 +1,6 @@
-﻿/*
-	jpeglsdll.h
-*/
+// Copyright (c) HEWLETT-PACKARD
+// License details can be found in: HP_ LICENSE.txt
+
 #ifndef JPEGLSLIB_H
 #define JPEGLSLIB_H
 

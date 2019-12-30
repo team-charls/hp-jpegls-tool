@@ -1,3 +1,6 @@
+// Copyright (c) Team CharLS.
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include "jpeglsdll.h"

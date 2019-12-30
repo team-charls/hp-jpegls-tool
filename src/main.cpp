@@ -1,5 +1,7 @@
-// hp-jpegls-test.cpp : This file contains the 'main' function. Program execution begins and ends there.
-//
+// Copyright (c) Team CharLS.
+// SPDX-License-Identifier: MIT
+
+#include "pch.h"
 
 #include "portable_anymap_file.h"
 
