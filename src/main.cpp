@@ -8,6 +8,7 @@
 #include <hp/jpegls.h>
 
 #include <algorithm>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -24,6 +25,7 @@ using std::ostream;
 using std::string;
 using std::stringstream;
 using std::vector;
+using std::chrono::steady_clock;
 using namespace std::string_literals;
 using namespace hp;
 
@@ -144,12 +146,22 @@ void encode(const char* source_filename, const char* destination_filename)
     codec.start_encode(write_buffer_callback, &destination_context, jpegls_info);
 
     source_context_t source_context{anymap_file.image_data()};
+
+    const auto start = steady_clock::now();
     const bool result = static_cast<bool>(JPEGLS_EncodeFromCB(codec.get(), read_buffer_callback, &source_context));
+    const auto encode_duration = steady_clock::now() - start;
+
     if (!result)
         throw std::exception("JPEGLS_EncodeFromCB");
 
-    destination_context.buffer_.resize(destination_context.position_);
+    const size_t encoded_size = destination_context.position_;
+    destination_context.buffer_.resize(encoded_size);
     save_file(destination_context.buffer_, destination_filename);
+
+    const double compression_ratio = static_cast<double>(anymap_file.image_data().size()) / encoded_size;
+    cout << "Info: original size = " << anymap_file.image_data().size() << ", encoded size = " << encoded_size
+         << ", compression ratio = " << std::setprecision(2) << compression_ratio << ":1"
+         << ", encode time = " << std::setprecision(4) << std::chrono::duration<double, std::milli>(encode_duration).count() << " ms\n";
 }
 
 void decode(const char* source_filename, const char* destination_filename)
@@ -167,10 +179,14 @@ void decode(const char* source_filename, const char* destination_filename)
     destination_context_t destination_context;
     destination_context.buffer_.resize(destination_size);
 
+    const auto start = steady_clock::now();
     codec.decode(write_buffer_callback, &destination_context);
+    const auto encode_duration = steady_clock::now() - start;
 
     portable_anymap_file::save(jpegls_info.width, jpegls_info.height,
                                jpegls_info.components, jpegls_info.alphabet, destination_context.buffer_, destination_filename);
+
+    cout << "Info: decode time = " << std::setprecision(4) << std::chrono::duration<double, std::milli>(encode_duration).count() << " ms\n";
 }
 
 } // namespace
