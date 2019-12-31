@@ -171,6 +171,8 @@ void decode(const char* source_filename, const char* destination_filename)
     const jpegls_codec codec;
 
     source_context_t source_context{move(source)};
+
+    const auto start = steady_clock::now();
     codec.start_decode(read_buffer_callback, &source_context);
 
     const JPEGLS_Info jpegls_info{codec.get_info()};
@@ -179,7 +181,6 @@ void decode(const char* source_filename, const char* destination_filename)
     destination_context_t destination_context;
     destination_context.buffer_.resize(destination_size);
 
-    const auto start = steady_clock::now();
     codec.decode(write_buffer_callback, &destination_context);
     const auto encode_duration = steady_clock::now() - start;
 
