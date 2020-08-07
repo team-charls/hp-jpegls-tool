@@ -1,4 +1,4 @@
-﻿// Copyright (c) Team CharLS.
+// Copyright (c) Team CharLS.
 // SPDX-License-Identifier: BSD-3-Clause
 
 #pragma once
@@ -7,6 +7,7 @@
 #include <string>
 #include <sstream>
 #include <fstream>
+#include <span>
 
 // Purpose: this class can read an image stored in the Portable Anymap Format (PNM).
 //          The 2 binary formats P5 and P6 are supported:
@@ -22,7 +23,7 @@ public:
         pnm_file.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
         pnm_file.open(filename, std::ios::in | std::ios::binary);
 
-        std::vector<int> header_info = read_header(pnm_file);
+        std::vector<size_t> header_info = read_header(pnm_file);
         if (header_info.size() != 4)
             throw std::ios_base::failure("Incorrect PNM header");
 
@@ -31,29 +32,29 @@ public:
         height_ = header_info[2];
         bits_per_sample_ = log_2(header_info[3] + 1);
 
-        const int bytes_per_sample = (bits_per_sample_ + 7) / 8;
-        input_buffer_.resize(static_cast<size_t>(width_) * height_ * bytes_per_sample * component_count_);
+        const size_t bytes_per_sample = (bits_per_sample_ + 7) / 8;
+        input_buffer_.resize(width_ * height_ * bytes_per_sample * component_count_);
         pnm_file.read(reinterpret_cast<char*>(input_buffer_.data()), input_buffer_.size());
 
         convert_to_little_endian_if_needed();
     }
 
-    int width() const noexcept
+    [[nodiscard]] size_t width() const noexcept
     {
         return width_;
     }
 
-    int height() const noexcept
+    [[nodiscard]] size_t height() const noexcept
     {
         return height_;
     }
 
-    int component_count() const noexcept
+    [[nodiscard]] size_t component_count() const noexcept
     {
         return component_count_;
     }
 
-    int bits_per_sample() const noexcept
+    [[nodiscard]] size_t bits_per_sample() const noexcept
     {
         return bits_per_sample_;
     }
@@ -63,12 +64,12 @@ public:
         return input_buffer_;
     }
 
-    const std::vector<std::byte>& image_data() const noexcept
+    [[nodiscard]] const std::vector<std::byte>& image_data() const noexcept
     {
         return input_buffer_;
     }
 
-    static void save(int width, int height, int component_count, int alphabet, const std::vector<std::byte>& image_data, const char* filename)
+    static void save(const char* filename, const size_t width, const size_t height, const size_t component_count, const size_t alphabet, const std::span<const std::byte> image_data)
     {
         std::ofstream output;
         output.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
@@ -80,9 +81,9 @@ public:
     }
 
 private:
-    static std::vector<int> read_header(std::istream& pnm_file)
+    static std::vector<size_t> read_header(std::istream& pnm_file)
     {
-        std::vector<int> result;
+        std::vector<size_t> result;
 
         const auto first = static_cast<char>(pnm_file.get());
 
@@ -103,16 +104,16 @@ private:
                 if (value <= 0)
                     break;
 
-                result.push_back(value);
+                result.push_back(static_cast<size_t>(value));
             }
         }
         return result;
     }
 
-    constexpr int32_t log_2(int32_t n) noexcept
+    static constexpr uint32_t log_2(const uint32_t n) noexcept
     {
-        int32_t x = 0;
-        while (n > (1 << x))
+        uint32_t x = 0;
+        while (n > (1U << x))
         {
             ++x;
         }
@@ -131,9 +132,9 @@ private:
         }
     }
 
-    int component_count_;
-    int width_;
-    int height_;
-    int bits_per_sample_;
+    size_t component_count_;
+    size_t width_;
+    size_t height_;
+    size_t bits_per_sample_;
     std::vector<std::byte> input_buffer_;
 };

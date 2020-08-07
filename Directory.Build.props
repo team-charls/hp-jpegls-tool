@@ -15,9 +15,6 @@
     <PlatformToolset>v142</PlatformToolset>
 
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)default.ruleset</CodeAnalysisRuleSet>
-
-    <!-- Assist VC package manager which configuration to use (checked is debug+static checking) -->
-    <VcpkgConfiguration Condition="'$(Configuration)' == 'Checked'">Debug</VcpkgConfiguration>
   </PropertyGroup>
 
   <ItemDefinitionGroup>
@@ -37,8 +34,6 @@
       <UseFullPaths>true</UseFullPaths>
 
       <!--
-        __cplusplus = Use the correct value for the __cplusplus macro
-        throwingNew = Communicate with the compiler that only the throwing variant of operator new is used.
         Disable level All warnings that are not useful:
         C4061 = enumerator 'identifier' in switch of enum 'enumeration' is not explicitly handled by a case label
         C4365 = action' : conversion from 'type_1' to 'type_2', signed/unsigned mismatch
@@ -59,22 +54,17 @@
         C5039 = 'function': pointer or reference to potentially throwing function passed to extern C function under -EHc. [Just informational]
         C5045 = Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified [Just informational]
       -->
-      <AdditionalOptions>
-        /Zc:__cplusplus /Zc:throwingNew
-        /wd4061 /wd4365 /wd4464 /wd4514 /wd4571 /wd4623 /wd4625 /wd4626 /wd4668
-        /wd4710 /wd4711 /wd4738 /wd4774 /wd4820 /wd5026 /wd5027 /wd5039 /wd5045
-      </AdditionalOptions>
+      <DisableSpecificWarnings>4061;4365;4464;4514;4571;4623;4625;4626;4668;4710;4711;4738;4774;4820;5026;5027;5039;5045</DisableSpecificWarnings>
 
       <!--
-        NOMINMAX = Prevent that the Windows SDK header files define the macros min and max.
+        __cplusplus = Use the correct value for the __cplusplus macro
+        throwingNew = Communicate with the compiler that only the throwing variant of operator new is used.
+        preprocessor = Use the conformant preprocessor. (will become default in the future)
+        char8_t = Enable support for the new C++20 char8_t type (will become default in the future)
       -->
-      <PreprocessorDefinitions>
-        WIN32;
-        _WINDOWS;
-        WIN32_LEAN_AND_MEAN;
-        NOMINMAX;
-        %(PreprocessorDefinitions)
-      </PreprocessorDefinitions>
+      <AdditionalOptions>
+        /Zc:__cplusplus /Zc:throwingNew /Zc:preprocessor /Zc:char8_t
+      </AdditionalOptions>
 
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include</AdditionalIncludeDirectories>
 
@@ -94,6 +84,7 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <RunCodeAnalysis>true</RunCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
 
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">

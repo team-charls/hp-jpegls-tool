@@ -44,3 +44,6 @@ C26494: Variable 'x' is uninitialized. Always initialize an object
 
 C26812: The enum type '.' is unscoped. Prefer 'enum class' over 'enum' (Enum.3).
 -> Rationale: complains about enums from the Windows SDK (false warnings).
+
+C26821:Consider using gsl::span instead of std::span to guarantee runtime bounds safety (gsl.view).
+-> Rationale: Stick to using std::span from C++20.

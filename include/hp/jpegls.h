@@ -62,6 +62,11 @@ public:
         return codec_.get();
     }
 
+    [[nodiscard]] const std::string& last_message() const noexcept
+    {
+        return last_message_;
+    }
+
 private:
     [[nodiscard]] static JPEGLS* create_codec()
     {
