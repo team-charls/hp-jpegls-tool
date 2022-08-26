@@ -23,7 +23,7 @@ public:
         pnm_file.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
         pnm_file.open(filename, std::ios::in | std::ios::binary);
 
-        std::vector<size_t> header_info = read_header(pnm_file);
+        const std::vector header_info{read_header(pnm_file)};
         if (header_info.size() != 4)
             throw std::ios_base::failure("Incorrect PNM header");
 
@@ -32,7 +32,7 @@ public:
         height_ = header_info[2];
         bits_per_sample_ = log_2(header_info[3] + 1);
 
-        const size_t bytes_per_sample = (bits_per_sample_ + 7) / 8;
+        const size_t bytes_per_sample{(bits_per_sample_ + 7) / 8};
         input_buffer_.resize(width_ * height_ * bytes_per_sample * component_count_);
         pnm_file.read(reinterpret_cast<char*>(input_buffer_.data()), input_buffer_.size());
 
@@ -75,7 +75,7 @@ public:
         output.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
         output.open(filename, std::ios::out | std::ios::binary);
 
-        const int component_count_id = component_count == 3 ? 6 : 5;
+        const int component_count_id{component_count == 3 ? 6 : 5};
         output << 'P' << component_count_id << '\n' << width << ' ' << height << '\n' << alphabet - 1 << '\n';
         output.write(reinterpret_cast<const char*>(image_data.data()), image_data.size());
     }
@@ -85,10 +85,8 @@ private:
     {
         std::vector<size_t> result;
 
-        const auto first = static_cast<char>(pnm_file.get());
-
         // All portable anymap format (PNM) start with the character P.
-        if (first != 'P')
+        if (const auto first{static_cast<char>(pnm_file.get())}; first != 'P')
             throw std::istream::failure("Missing P");
 
         while (result.size() < 4)
@@ -99,7 +97,7 @@ private:
 
             while (result.size() < 4)
             {
-                int value = -1;
+                int value{-1};
                 line >> value;
                 if (value <= 0)
                     break;
@@ -112,7 +110,7 @@ private:
 
     static constexpr uint32_t log_2(const uint32_t n) noexcept
     {
-        uint32_t x = 0;
+        uint32_t x{};
         while (n > (1U << x))
         {
             ++x;

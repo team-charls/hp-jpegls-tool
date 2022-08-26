@@ -12,7 +12,7 @@
     <!-- Default character set is Unicode (UTF16), defines _UNICODE and UNICODE. -->
     <CharacterSet>Unicode</CharacterSet>
 
-    <PlatformToolset>v142</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
 
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)default.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
@@ -22,11 +22,8 @@
       <!-- Use all cores to speed up the compilation (MS recommended best practice). -->
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
 
-      <!-- Explicit define that all projects are compiled according the latest C++ standard -->
-      <LanguageStandard>stdcpplatest</LanguageStandard>
-
-      <!-- Explicit disable non conforming MSVC compiler options that are not compatible with the C++ standard -->
-      <ConformanceMode>true</ConformanceMode>
+      <!-- Explicit define that all projects are compiled according the C++20 standard -->
+      <LanguageStandard>stdcpp20</LanguageStandard>
 
       <!-- To ensure high quality C++ code use Warning level All and treat warnings as errors to ensure warnings are fixed promptly. -->
       <WarningLevel>EnableAllWarnings</WarningLevel>
@@ -60,11 +57,8 @@
         __cplusplus = Use the correct value for the __cplusplus macro
         throwingNew = Communicate with the compiler that only the throwing variant of operator new is used.
         preprocessor = Use the conformant preprocessor. (will become default in the future)
-        char8_t = Enable support for the new C++20 char8_t type (will become default in the future)
       -->
-      <AdditionalOptions>
-        /Zc:__cplusplus /Zc:throwingNew /Zc:preprocessor /Zc:char8_t
-      </AdditionalOptions>
+      <AdditionalOptions>/Zc:__cplusplus /Zc:throwingNew /Zc:preprocessor</AdditionalOptions>
 
       <AdditionalIncludeDirectories>$(MSBuildThisFileDirectory)include</AdditionalIncludeDirectories>
 
@@ -84,7 +78,7 @@
 
   <PropertyGroup Condition="'$(Configuration)'=='Release'">
     <RunCodeAnalysis>true</RunCodeAnalysis>
-    <EnableClangTidyCodeAnalysis>true</EnableClangTidyCodeAnalysis>
+    <EnableClangTidyCodeAnalysis>false</EnableClangTidyCodeAnalysis>
   </PropertyGroup>
 
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">

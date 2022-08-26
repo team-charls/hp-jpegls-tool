@@ -206,16 +206,16 @@ void decode(const char* source_filename, const char* destination_filename)
     const auto start = steady_clock::now();
     codec.start_decode(source_context_t::read_buffer_callback, &source_context);
 
-    const JPEGLS_Info jpegls_info{codec.get_info()};
+    const auto [width, height, alphabet, components, doRestart, restartInterval, samplingX, samplingY, componentId, scanCount, scan]{codec.get_info()};
 
-    const size_t destination_size = jpegls_info.width * jpegls_info.height * jpegls_info.components * bytes_per_sample(jpegls_info.alphabet);
+    const size_t destination_size{width * height * components * bytes_per_sample(alphabet)};
     destination_context_t destination_context{destination_size};
 
     codec.decode(destination_context_t::write_buffer_callback, &destination_context);
     const auto encode_duration = steady_clock::now() - start;
 
-    portable_anymap_file::save(destination_filename, jpegls_info.width, jpegls_info.height,
-                               jpegls_info.components, jpegls_info.alphabet, destination_context.buffer());
+    portable_anymap_file::save(destination_filename, width, height,
+                               components, alphabet, destination_context.buffer());
 
     cout << "Info: decode time = " << std::setprecision(4) << std::chrono::duration<double, std::milli>(encode_duration).count() << " ms\n";
 }
