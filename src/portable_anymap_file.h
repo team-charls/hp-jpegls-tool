@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <vector>
 #include <string>
 #include <sstream>
@@ -30,7 +31,7 @@ public:
         component_count_ = header_info[0] == 6 ? 3 : 1;
         width_ = header_info[1];
         height_ = header_info[2];
-        bits_per_sample_ = log_2(header_info[3] + 1);
+        bits_per_sample_ = max_value_to_bits_per_sample(header_info[3]);
 
         const size_t bytes_per_sample{(bits_per_sample_ + 7) / 8};
         input_buffer_.resize(width_ * height_ * bytes_per_sample * component_count_);
@@ -59,7 +60,7 @@ public:
         return bits_per_sample_;
     }
 
-    std::vector<std::byte>& image_data() noexcept
+    [[nodiscard]] std::vector<std::byte>& image_data() noexcept
     {
         return input_buffer_;
     }
@@ -81,7 +82,7 @@ public:
     }
 
 private:
-    static std::vector<size_t> read_header(std::istream& pnm_file)
+    [[nodiscard]] static std::vector<size_t> read_header(std::istream& pnm_file)
     {
         std::vector<size_t> result;
 
@@ -108,14 +109,16 @@ private:
         return result;
     }
 
-    static constexpr uint32_t log_2(const uint32_t n) noexcept
+    [[nodiscard]] static constexpr uint32_t log2_floor(const uint32_t n) noexcept
     {
-        uint32_t x{};
-        while (n > (1U << x))
-        {
-            ++x;
-        }
-        return x;
+        assert(n != 0 && "log2 is not defined for 0");
+        return 31 - std::countl_zero(n);
+    }
+
+    [[nodiscard]] static constexpr uint32_t max_value_to_bits_per_sample(const uint32_t max_value) noexcept
+    {
+        assert(max_value > 0);
+        return log2_floor(max_value) + 1;
     }
 
     void convert_to_little_endian_if_needed() noexcept

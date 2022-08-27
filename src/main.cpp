@@ -18,21 +18,28 @@
 #include <vector>
 
 using std::byte;
-using std::cout;
 using std::exception;
+using std::format;
 using std::ifstream;
 using std::ios;
 using std::istream;
 using std::ostream;
+using std::puts;
 using std::span;
 using std::string;
 using std::stringstream;
 using std::vector;
+using std::chrono::duration;
 using std::chrono::steady_clock;
 using namespace std::string_literals;
 using namespace hp;
 
 namespace {
+
+void puts(const std::string& str) noexcept
+{
+    std::puts(str.c_str());
+}
 
 class source_context_t final
 {
@@ -42,18 +49,16 @@ public:
     {
     }
 
-    static uint32_t read_buffer_callback(void* context, byte* buffer, const uint32_t length) noexcept
+    [[nodiscard]] static uint32_t read_buffer_callback(void* context, byte* buffer, const uint32_t length) noexcept
     {
-        auto* source_context = static_cast<source_context_t*>(context);
-
+        auto* source_context{static_cast<source_context_t*>(context)};
         return source_context->read({buffer, length});
     }
 
 private:
-    uint32_t read(const span<byte> buffer) noexcept
+    [[nodiscard]] uint32_t read(const span<byte> buffer) noexcept
     {
-        const size_t bytes_to_copy = std::min(buffer.size(), buffer_.size() - position_);
-
+        const size_t bytes_to_copy{std::min(buffer.size(), buffer_.size() - position_)};
         memcpy(buffer.data(), &buffer_[position_], bytes_to_copy);
         position_ += bytes_to_copy;
 
@@ -80,7 +85,7 @@ public:
 
     void resize_buffer()
     {
-        const size_t encoded_size = position_;
+        const size_t encoded_size{position_};
         buffer_.resize(encoded_size);
     }
 
@@ -89,18 +94,18 @@ public:
         return buffer_;
     }
 
-    static BOOL write_buffer_callback(void* context, const byte* buffer, const uint32_t length) noexcept
+    [[nodiscard]] static BOOL write_buffer_callback(void* context, const byte* buffer, const uint32_t length) noexcept
     {
         if (length == 0)
             return static_cast<BOOL>(true); // Note: calling JPEGLS_Destroy may call callback with 0 bytes.
 
-        auto* destination_context = static_cast<destination_context_t*>(context);
+        auto* destination_context{static_cast<destination_context_t*>(context)};
 
         return static_cast<BOOL>(destination_context->write({buffer, length}));
     }
 
 private:
-    bool write(const std::span<const byte> buffer) noexcept
+    [[nodiscard]] bool write(const std::span<const byte> buffer) noexcept
     {
         if (buffer.size() > buffer_.size() - position_)
             return false;
@@ -111,12 +116,12 @@ private:
         return true;
     }
 
-    static constexpr size_t bit_to_byte_count(const size_t bit_count) noexcept
+    [[nodiscard]] static constexpr size_t bit_to_byte_count(const size_t bit_count) noexcept
     {
         return (bit_count + 7U) / 8U;
     }
 
-    static constexpr size_t estimated_encoded_size(const size_t width, const size_t height, const size_t component_count, const size_t bits_per_sample)
+    [[nodiscard]] static constexpr size_t estimated_encoded_size(const size_t width, const size_t height, const size_t component_count, const size_t bits_per_sample)
     {
         return width * height * component_count * bit_to_byte_count(bits_per_sample) + 1024;
     }
@@ -126,7 +131,7 @@ private:
 };
 
 
-vector<byte> read_file(const char* filename)
+[[nodiscard]] vector<byte> read_file(const char* filename)
 {
     ifstream input;
     input.exceptions(ios::eofbit | ios::failbit | ios::badbit);
@@ -151,7 +156,7 @@ void save_file(const char* filename, const span<const byte> data)
     output.write(reinterpret_cast<const char*>(data.data()), data.size());
 }
 
-constexpr size_t bytes_per_sample(const uint32_t alphabet) noexcept
+[[nodiscard]] constexpr size_t bytes_per_sample(const uint32_t alphabet) noexcept
 {
     return alphabet > 256 ? 2 : 1;
 }
@@ -179,9 +184,9 @@ void encode(const char* source_filename, const char* destination_filename)
 
     source_context_t source_context{anymap_file.image_data()};
 
-    const auto start = steady_clock::now();
-    const bool result = static_cast<bool>(JPEGLS_EncodeFromCB(codec.get(), source_context_t::read_buffer_callback, &source_context));
-    const auto encode_duration = steady_clock::now() - start;
+    const auto start_point{steady_clock::now()};
+    const bool result{static_cast<bool>(JPEGLS_EncodeFromCB(codec.get(), source_context_t::read_buffer_callback, &source_context))};
+    const auto encode_duration{steady_clock::now() - start_point};
 
     if (!result)
         throw std::exception(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
@@ -189,21 +194,19 @@ void encode(const char* source_filename, const char* destination_filename)
     destination_context.resize_buffer();
     save_file(destination_filename, destination_context.buffer());
 
-    const double compression_ratio = static_cast<double>(anymap_file.image_data().size()) / destination_context.buffer().size();
-    cout << "Info: original size = " << anymap_file.image_data().size() << ", encoded size = " << destination_context.buffer().size()
-         << ", compression ratio = " << std::setprecision(2) << compression_ratio << ":1"
-         << ", encode time = " << std::setprecision(4) << std::chrono::duration<double, std::milli>(encode_duration).count() << " ms\n";
+    const double compression_ratio{static_cast<double>(anymap_file.image_data().size()) / destination_context.buffer().size()};
+    puts(format("Info: original size = {}, encoded size = {}, compression ratio = {:.2f}:1, encode time = {:.4f} ms",
+                anymap_file.image_data().size(), destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count()));
 }
 
 void decode(const char* source_filename, const char* destination_filename)
 {
-    vector<byte> source = read_file(source_filename);
+    vector source{read_file(source_filename)};
+    source_context_t source_context{move(source)};
 
     const jpegls_codec codec;
 
-    source_context_t source_context{move(source)};
-
-    const auto start = steady_clock::now();
+    const auto start_point{steady_clock::now()};
     codec.start_decode(source_context_t::read_buffer_callback, &source_context);
 
     const auto [width, height, alphabet, components, doRestart, restartInterval, samplingX, samplingY, componentId, scanCount, scan]{codec.get_info()};
@@ -212,19 +215,19 @@ void decode(const char* source_filename, const char* destination_filename)
     destination_context_t destination_context{destination_size};
 
     codec.decode(destination_context_t::write_buffer_callback, &destination_context);
-    const auto encode_duration = steady_clock::now() - start;
+    const auto encode_duration{steady_clock::now() - start_point};
 
     portable_anymap_file::save(destination_filename, width, height,
                                components, alphabet, destination_context.buffer());
 
-    cout << "Info: decode time = " << std::setprecision(4) << std::chrono::duration<double, std::milli>(encode_duration).count() << " ms\n";
+    puts(format("Info: decode time = {:.4f} ms", duration<double, std::milli>(encode_duration).count()));
 }
 
 void log_failure(const exception& error) noexcept
 {
     try
     {
-        std::cerr << "Unexpected failure: " << error.what() << '\n';
+        std::cerr << format("Unexpected failure: {}\n", error.what());
     }
     catch (...)
     {
@@ -241,7 +244,7 @@ int main(const int argc, const char* const argv[])
     {
         if (argc < 4)
         {
-            cout << "usage: hp-jpegls-test <operation (encode | decode> <input> <output>\n";
+            puts("usage: hp-jpegls-tool <operation (encode | decode> <input-filename> <output-filename>\n");
             return EXIT_FAILURE;
         }
 
@@ -257,7 +260,7 @@ int main(const int argc, const char* const argv[])
             }
             else
             {
-                cout << "Unknown operation: " << argv[1] << '\n';
+                puts(format("Unknown operation: {}", argv[1]));
             }
         }
 
