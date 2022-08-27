@@ -28,7 +28,7 @@ public:
         if (header_info.size() != 4)
             throw std::ios_base::failure("Incorrect PNM header");
 
-        component_count_ = header_info[0] == 6 ? 3 : 1;
+        component_count_ = header_info[0] == 6 ? 3U : 1U;
         width_ = header_info[1];
         height_ = header_info[2];
         bits_per_sample_ = max_value_to_bits_per_sample(header_info[3]);
@@ -112,7 +112,7 @@ private:
     [[nodiscard]] static constexpr uint32_t log2_floor(const uint32_t n) noexcept
     {
         assert(n != 0 && "log2 is not defined for 0");
-        return 31 - std::countl_zero(n);
+        return 31U - std::countl_zero(n);
     }
 
     [[nodiscard]] static constexpr uint32_t max_value_to_bits_per_sample(const uint32_t max_value) noexcept

@@ -158,7 +158,7 @@ void save_file(const char* filename, const span<const byte> data)
 
 [[nodiscard]] constexpr size_t bytes_per_sample(const uint32_t alphabet) noexcept
 {
-    return alphabet > 256 ? 2 : 1;
+    return alphabet > 256 ? 2U : 1U;
 }
 
 
@@ -173,7 +173,7 @@ void encode(const char* source_filename, const char* destination_filename)
     jpegls_info.width = anymap_file.width();
     jpegls_info.height = anymap_file.height();
     jpegls_info.components = anymap_file.component_count();
-    jpegls_info.alphabet = 1 << anymap_file.bits_per_sample();
+    jpegls_info.alphabet = 1U << anymap_file.bits_per_sample();
     jpegls_info.scan[0].components = anymap_file.component_count();
     jpegls_info.scan[0].interleave = anymap_file.component_count() > 1 ? JPEGLS_Interleave::line : JPEGLS_Interleave::none;
 
