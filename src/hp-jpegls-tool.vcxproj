@@ -84,6 +84,9 @@
     <ClInclude Include="portable_anymap_file.h" />
   </ItemGroup>
   <ItemGroup>
+    <Manifest Include="app.manifest" />
+  </ItemGroup>
+  <ItemGroup>
     <CopyFileToFolders Include="..\include\hp\jpegls.dll">
       <FileType>Document</FileType>
     </CopyFileToFolders>
