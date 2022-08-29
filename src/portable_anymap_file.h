@@ -18,7 +18,7 @@ class portable_anymap_file final
 {
 public:
     /// <exception cref="ifstream::failure">Thrown when the input file cannot be read.</exception>
-    explicit portable_anymap_file(const char* filename)
+    explicit portable_anymap_file(const std::string_view filename)
     {
         std::ifstream pnm_file;
         pnm_file.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);
@@ -70,7 +70,7 @@ public:
         return input_buffer_;
     }
 
-    static void save(const char* filename, const size_t width, const size_t height, const size_t component_count, const size_t alphabet, const std::span<const std::byte> image_data)
+    static void save(const std::string_view filename, const size_t width, const size_t height, const size_t component_count, const size_t alphabet, const std::span<const std::byte> image_data)
     {
         std::ofstream output;
         output.exceptions(std::ios::eofbit | std::ios::failbit | std::ios::badbit);

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <expected>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
@@ -22,12 +23,14 @@ using std::exception;
 using std::format;
 using std::ifstream;
 using std::ios;
-using std::istream;
-using std::ostream;
+using std::ofstream;
 using std::puts;
 using std::span;
 using std::string;
+using std::string_view;
 using std::stringstream;
+using std::tuple;
+using std::unexpected;
 using std::vector;
 using std::chrono::duration;
 using std::chrono::steady_clock;
@@ -105,7 +108,7 @@ public:
     }
 
 private:
-    [[nodiscard]] bool write(const std::span<const byte> buffer) noexcept
+    [[nodiscard]] bool write(const span<const byte> buffer) noexcept
     {
         if (buffer.size() > buffer_.size() - position_)
             return false;
@@ -130,12 +133,16 @@ private:
     size_t position_{};
 };
 
+void open_stream(auto& stream, const string_view filename, std::ios::openmode mode)
+{
+    stream.exceptions(ios::eofbit | ios::failbit | ios::badbit);
+    stream.open(filename, mode);
+}
 
-[[nodiscard]] vector<byte> read_file(const char* filename)
+[[nodiscard]] vector<byte> read_file(const string_view filename)
 {
     ifstream input;
-    input.exceptions(ios::eofbit | ios::failbit | ios::badbit);
-    input.open(filename, ios::in | ios::binary);
+    open_stream(input, filename, ios::in | ios::binary);
 
     input.seekg(0, ios::end);
     const auto byte_count_file = static_cast<size_t>(input.tellg());
@@ -147,11 +154,10 @@ private:
     return buffer;
 }
 
-void save_file(const char* filename, const span<const byte> data)
+void save_file(const string_view filename, const span<const byte> data)
 {
-    std::ofstream output;
-    output.exceptions(ios::eofbit | ios::failbit | ios::badbit);
-    output.open(filename, ios::out | ios::binary);
+    ofstream output;
+    open_stream(output, filename, ios::out | ios::binary);
 
     output.write(reinterpret_cast<const char*>(data.data()), data.size());
 }
@@ -162,7 +168,7 @@ void save_file(const char* filename, const span<const byte> data)
 }
 
 
-void encode(const char* source_filename, const char* destination_filename)
+void encode(const string_view source_filename, const string_view destination_filename)
 {
     portable_anymap_file anymap_file{source_filename};
 
@@ -189,7 +195,7 @@ void encode(const char* source_filename, const char* destination_filename)
     const auto encode_duration{steady_clock::now() - start_point};
 
     if (!result)
-        throw std::exception(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
+        throw exception(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
 
     destination_context.resize_buffer();
     save_file(destination_filename, destination_context.buffer());
@@ -199,7 +205,7 @@ void encode(const char* source_filename, const char* destination_filename)
                 anymap_file.image_data().size(), destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count()));
 }
 
-void decode(const char* source_filename, const char* destination_filename)
+void decode(const string_view source_filename, const string_view destination_filename)
 {
     vector source{read_file(source_filename)};
     source_context_t source_context{move(source)};
@@ -236,39 +242,54 @@ void log_failure(const exception& error) noexcept
     }
 }
 
+enum class command
+{
+    encode,
+    decode
+};
+
+std::expected<tuple<command, string, string>, string> parse_command_line(const int argc, const char* const argv[])
+{
+    if (argc < 4)
+        return unexpected("usage: hp-jpegls-tool <operation: encode | decode> <input-filename> <output-filename>\n");
+
+    if (argv[1] == "encode"s)
+        return tuple{command::encode, argv[2], argv[3]};
+
+    if (argv[1] == "decode"s)
+        return tuple{command::decode, argv[2], argv[3]};
+
+    return unexpected(format("Unknown operation: {}", argv[1]));
+}
+
 } // namespace
 
+
 int main(const int argc, const char* const argv[])
+try
 {
-    try
+    const auto request{parse_command_line(argc, argv)};
+    if (!request.has_value())
     {
-        if (argc < 4)
-        {
-            puts("usage: hp-jpegls-tool <operation (encode | decode> <input-filename> <output-filename>\n");
-            return EXIT_FAILURE;
-        }
-
-        if (argv[1] == "encode"s)
-        {
-            encode(argv[2], argv[3]);
-        }
-        else
-        {
-            if (argv[1] == "decode"s)
-            {
-                decode(argv[2], argv[3]);
-            }
-            else
-            {
-                puts(format("Unknown operation: {}", argv[1]));
-            }
-        }
-
-        return EXIT_SUCCESS;
-    }
-    catch (const exception& error)
-    {
-        log_failure(error);
+        puts(request.error());
         return EXIT_FAILURE;
     }
+
+    switch (const auto& [command, source_filename, destination_filename]{request.value()}; command)
+    {
+    case command::encode:
+        encode(source_filename, destination_filename);
+        break;
+
+    case command::decode:
+        decode(source_filename, destination_filename);
+        break;
+    }
+
+    return EXIT_SUCCESS;
+}
+catch (const exception& error)
+{
+    log_failure(error);
+    return EXIT_FAILURE;
 }
