@@ -1,15 +1,22 @@
 // Copyright (c) Team CharLS.
 // SPDX-License-Identifier: MIT
 
-#pragma once
+module;
 
 #include "jpeglsdll.h"
 
-#include <string>
-#include <exception>
-#include <memory>
+export module hp.jpegls;
 
-namespace hp {
+import std;
+// #include <string>
+// #include <exception>
+// #include <memory>
+
+export using hp::BOOL;
+export using hp::JPEGLS_GetDefaultInfo;
+export using hp::JPEGLS_EncodeFromCB;
+
+export namespace hp {
 
 class jpegls_codec final
 {
