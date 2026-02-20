@@ -172,24 +172,18 @@ void encode(const string_view source_filename, const string_view destination_fil
     JPEGLS_GetDefaultInfo(&jpegls_info);
     jpegls_info.width = anymap_file.width();
     jpegls_info.height = anymap_file.height();
-    jpegls_info.components = anymap_file.component_count();
     jpegls_info.alphabet = 1U << anymap_file.bits_per_sample();
-    jpegls_info.scan[0].components = anymap_file.component_count();
     jpegls_info.scan[0].interleave = anymap_file.component_count() > 1 ? JPEGLS_Interleave::line : JPEGLS_Interleave::none;
+    jpegls_info.scan[0].alphabet = jpegls_info.alphabet;
 
     destination_context_t destination_context(jpegls_info.width,
                                               jpegls_info.height, anymap_file.component_count(), anymap_file.bits_per_sample());
-
     codec.start_encode(destination_context_t::write_buffer_callback, &destination_context, jpegls_info);
 
     source_context_t source_context{anymap_file.image_data()};
-
     const auto start_point{steady_clock::now()};
-    const bool result{static_cast<bool>(JPEGLS_EncodeFromCB(codec.get(), source_context_t::read_buffer_callback, &source_context))};
+    codec.encode(source_context_t::read_buffer_callback, &source_context); // Note: encode only works for 8-bit data.
     const auto encode_duration{steady_clock::now() - start_point};
-
-    if (!result)
-        throw runtime_error(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
 
     destination_context.resize_buffer();
     save_file(destination_filename, destination_context.buffer());
