@@ -36,6 +36,7 @@
         C4623 = derived class' : default constructor was implicitly defined as deleted because a base class default constructor is inaccessible or deleted [Just informational]
         C4625 = derived class' : copy constructor was implicitly defined as deleted because a base class copy constructor is inaccessible or deleted [Just informational]
         C4626 = derived class' : assignment operator was implicitly defined as deleted because a base class assignment operator is inaccessible or deleted [Just informational]
+        C4686 = possible change in behavior, change in UDT return calling convention
         C4710 = function '' function not inlined [Just informational]
         C4711 = function '' selected for automatic inline expansion [Just informational]
         C4738 = storing 32-bit float result in memory, possible loss of performance [Just informational]
@@ -46,7 +47,7 @@
         C5039 = 'function': pointer or reference to potentially throwing function passed to extern C function under -EHc. [Just informational]
         C5045 = Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified [Just informational]
       -->
-      <DisableSpecificWarnings>4464;4514;4571;4623;4625;4626;4710;4711;4738;4774;4820;5026;5027;5039;5045</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4464;4514;4571;4623;4625;4626;4686;4710;4711;4738;4774;4820;5026;5027;5039;5045</DisableSpecificWarnings>
 
       <!--
         __cplusplus = Use the correct value for the __cplusplus macro

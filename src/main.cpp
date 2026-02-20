@@ -1,35 +1,24 @@
 // Copyright (c) Team CharLS.
 // SPDX-License-Identifier: MIT
 
-#include "pch.h"
-
-#include "portable_anymap_file.h"
-
-#include <hp/jpegls.h>
-
-#include <algorithm>
-#include <cassert>
-#include <chrono>
-#include <expected>
-#include <filesystem>
-#include <fstream>
-#include <iostream>
-#include <span>
-#include <string>
-#include <vector>
+import std;
+import portable_anymap_file;
+import hp.jpegls;
+import <cassert>;
 
 using std::byte;
-using std::exception;
 using std::format;
 using std::ifstream;
 using std::ios;
 using std::ofstream;
-using std::puts;
+using std::println;
+using std::runtime_error;
 using std::span;
 using std::string;
 using std::string_view;
 using std::stringstream;
 using std::tuple;
+using std::uint32_t;
 using std::unexpected;
 using std::vector;
 using std::chrono::duration;
@@ -39,10 +28,8 @@ using namespace hp;
 
 namespace {
 
-void puts(const std::string& str) noexcept
-{
-    std::puts(str.c_str());
-}
+constexpr int exit_success{0};
+constexpr int exit_failure{1};
 
 class source_context_t final
 {
@@ -202,14 +189,14 @@ void encode(const string_view source_filename, const string_view destination_fil
     const auto encode_duration{steady_clock::now() - start_point};
 
     if (!result)
-        throw exception(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
+        throw runtime_error(codec.last_message().empty() ? "JPEGLS_EncodeFromCB" : codec.last_message().c_str());
 
     destination_context.resize_buffer();
     save_file(destination_filename, destination_context.buffer());
 
     const double compression_ratio{static_cast<double>(anymap_file.image_data().size()) / destination_context.buffer().size()};
-    puts(format("Info: original size = {}, encoded size = {}, compression ratio = {:.2f}:1, encode time = {:.4f} ms",
-                anymap_file.image_data().size(), destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count()));
+    println("Info: original size = {}, encoded size = {}, compression ratio = {:.2f}:1, encode time = {:.4f} ms",
+            anymap_file.image_data().size(), destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count());
 }
 
 void decode(const string_view source_filename, const string_view destination_filename)
@@ -240,15 +227,15 @@ void decode(const string_view source_filename, const string_view destination_fil
     portable_anymap_file::save(destination_filename, width, height,
                                components, alphabet, destination_context.buffer());
 
-    puts(format("Info: decode time = {:.4f} ms", duration<double, std::milli>(encode_duration).count()));
+    println("Info: decode time = {:.4f} ms", duration<double, std::milli>(encode_duration).count());
 }
 
 
-void log_failure(const exception& error) noexcept
+void log_failure(const runtime_error& error) noexcept
 {
     try
     {
-        std::cerr << format("Unexpected failure: {}\n", error.what());
+        println(std::cerr, "Unexpected failure: {}", error.what());
     }
     catch (...)
     {
@@ -286,8 +273,8 @@ try
     const auto request{parse_command_line(argc, argv)};
     if (!request.has_value())
     {
-        puts(request.error());
-        return EXIT_FAILURE;
+        println("{}", request.error());
+        return exit_failure;
     }
 
     switch (const auto& [command, source_filename, destination_filename]{request.value()}; command)
@@ -301,10 +288,10 @@ try
         break;
     }
 
-    return EXIT_SUCCESS;
+    return exit_success;
 }
-catch (const exception& error)
+catch (const runtime_error& error)
 {
     log_failure(error);
-    return EXIT_FAILURE;
+    return exit_failure;
 }

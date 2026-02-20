@@ -1,20 +1,22 @@
 // Copyright (c) Team CharLS.
 // SPDX-License-Identifier: BSD-3-Clause
 
-#pragma once
+export module portable_anymap_file;
 
-#include <cassert>
-#include <vector>
-#include <string>
-#include <sstream>
-#include <fstream>
-#include <span>
+import std;
+
+import <cassert>;
+//#include <vector>
+//#include <string>
+//#include <sstream>
+//#include <fstream>
+//#include <span>
 
 // Purpose: this class can read an image stored in the Portable Anymap Format (PNM).
 //          The 2 binary formats P5 and P6 are supported:
 //          Portable GrayMap: P5 = binary, extension = .pgm, 0-2^16 (gray scale)
 //          Portable PixMap: P6 = binary, extension.ppm, range 0-2^16 (RGB)
-class portable_anymap_file final
+export class portable_anymap_file final
 {
 public:
     /// <exception cref="ifstream::failure">Thrown when the input file cannot be read.</exception>
@@ -109,7 +111,7 @@ private:
         return result;
     }
 
-    [[nodiscard]] static constexpr uint32_t log2_floor(const uint32_t n) noexcept
+    [[nodiscard]] static constexpr std::uint32_t log2_floor(const uint32_t n) noexcept
     {
         assert(n != 0 && "log2 is not defined for 0");
         return 31U - std::countl_zero(n);
