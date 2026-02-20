@@ -48,7 +48,7 @@ class source_context_t final
 {
 public:
     explicit source_context_t(vector<byte> buffer) noexcept :
-        buffer_{move(buffer)}
+        buffer_{std::move(buffer)}
     {
     }
 
@@ -68,7 +68,7 @@ private:
         return bytes_to_copy;
     }
 
-    const vector<byte> buffer_;
+    vector<byte> buffer_;
     size_t position_{};
 };
 
@@ -92,7 +92,7 @@ public:
         buffer_.resize(encoded_size);
     }
 
-    [[nodiscard]] const vector<byte>& buffer() const noexcept
+    [[nodiscard]] span<const byte> buffer() const noexcept
     {
         return buffer_;
     }
@@ -105,6 +105,14 @@ public:
         auto* destination_context{static_cast<destination_context_t*>(context)};
 
         return static_cast<BOOL>(destination_context->write({buffer, length}));
+    }
+
+    void convert_buffer_to_big_endian() noexcept
+    {
+        for (size_t i{}; i < buffer_.size() - 1; i += 2)
+        {
+            std::swap(buffer_[i], buffer_[i + 1]);
+        }
     }
 
 private:
@@ -167,7 +175,6 @@ void save_file(const string_view filename, const span<const byte> data)
     return alphabet > 256 ? 2U : 1U;
 }
 
-
 void encode(const string_view source_filename, const string_view destination_filename)
 {
     portable_anymap_file anymap_file{source_filename};
@@ -208,7 +215,7 @@ void encode(const string_view source_filename, const string_view destination_fil
 void decode(const string_view source_filename, const string_view destination_filename)
 {
     vector source{read_file(source_filename)};
-    source_context_t source_context{move(source)};
+    source_context_t source_context{std::move(source)};
 
     const jpegls_codec codec;
 
@@ -223,11 +230,19 @@ void decode(const string_view source_filename, const string_view destination_fil
     codec.decode(destination_context_t::write_buffer_callback, &destination_context);
     const auto encode_duration{steady_clock::now() - start_point};
 
+    if (bytes_per_sample(alphabet) > 1U)
+    {
+        // The HP decoder will return the pixels in little endian.
+        // Anymap files with multibyte pixels are stored in big endian format in the file.
+        destination_context.convert_buffer_to_big_endian();
+    }
+
     portable_anymap_file::save(destination_filename, width, height,
                                components, alphabet, destination_context.buffer());
 
     puts(format("Info: decode time = {:.4f} ms", duration<double, std::milli>(encode_duration).count()));
 }
+
 
 void log_failure(const exception& error) noexcept
 {
@@ -242,7 +257,7 @@ void log_failure(const exception& error) noexcept
     }
 }
 
-enum class command
+enum class command : std::uint8_t
 {
     encode,
     decode

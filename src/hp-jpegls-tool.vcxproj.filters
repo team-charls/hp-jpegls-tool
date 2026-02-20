@@ -34,4 +34,7 @@
       <Filter>3rd party DLLs</Filter>
     </CopyFileToFolders>
   </ItemGroup>
+  <ItemGroup>
+    <Manifest Include="app.manifest" />
+  </ItemGroup>
 </Project>

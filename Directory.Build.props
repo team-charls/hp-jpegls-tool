@@ -12,8 +12,6 @@
     <!-- Default character set is Unicode (UTF16), defines _UNICODE and UNICODE. -->
     <CharacterSet>Unicode</CharacterSet>
 
-    <PlatformToolset>v143</PlatformToolset>
-
     <CodeAnalysisRuleSet>$(MSBuildThisFileDirectory)default.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
 
