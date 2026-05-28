@@ -13,9 +13,6 @@
 
       <!-- Activate the UTF-8 code page (requires Windows 10 1903 or newer) -->
       <activeCodePage xmlns="http://schemas.microsoft.com/SMI/2019/WindowsSettings">UTF-8</activeCodePage>
-
-      <!-- Activate the new memory heap (requires Windows 10 2004 or newer) -->
-      <heapType xmlns="http://schemas.microsoft.com/SMI/2020/WindowsSettings">SegmentHeap</heapType>
     </windowsSettings>
   </application>
 </assembly>

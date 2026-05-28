@@ -23,6 +23,7 @@
     <ClCompile Include="..\include\hp\jpegls.ixx">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="argparse.cppm" />
   </ItemGroup>
   <ItemGroup>
     <CopyFileToFolders Include="..\include\hp\jpegls.dll">

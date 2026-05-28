@@ -4,6 +4,7 @@
 import std;
 import portable_anymap_file;
 import hp.jpegls;
+import argparse;
 import <cassert>;
 
 using std::byte;
@@ -18,6 +19,7 @@ using std::string;
 using std::string_view;
 using std::stringstream;
 using std::tuple;
+using std::int32_t;
 using std::uint32_t;
 using std::unexpected;
 using std::vector;
@@ -25,11 +27,43 @@ using std::chrono::duration;
 using std::chrono::steady_clock;
 using namespace std::string_literals;
 using namespace hp;
+using argparse::ArgumentParser;
+namespace fs = std::filesystem;
 
 namespace {
 
 constexpr int exit_success{0};
 constexpr int exit_failure{1};
+
+const char* const input_argument{"input"};
+const char* const output_argument{"output"};
+const char* const interleave_mode_argument{"--interleave-mode"};
+const char* const near_lossless_argument{"--near-lossless"};
+const char* const color_transform_argument{"--color-transform"};
+constexpr int32_t default_interleave_mode{-1};
+
+[[nodiscard]]
+int32_t get_interleave_mode_argument(const ArgumentParser& command)
+{
+    const auto interleave_mode{command.present<int32_t>(interleave_mode_argument)};
+    return interleave_mode.value_or(default_interleave_mode);
+}
+
+[[nodiscard]]
+uint32_t get_near_lossless_argument(const ArgumentParser& command)
+{
+    static constexpr uint32_t default_near_lossless{0};
+    const auto near{command.present<uint32_t>(near_lossless_argument)};
+    return near.value_or(default_near_lossless);
+}
+
+[[nodiscard]]
+uint32_t get_color_transform_argument(const ArgumentParser& command)
+{
+    static constexpr uint32_t default_color_transform{0};
+    const auto near{command.present<uint32_t>(color_transform_argument)};
+    return near.value_or(default_color_transform);
+}
 
 class source_context_t final
 {
@@ -162,7 +196,7 @@ void save_file(const string_view filename, const span<const byte> data)
     return alphabet > 256 ? 2U : 1U;
 }
 
-void encode(const string_view source_filename, const string_view destination_filename)
+void encode(const string_view source_filename, const string_view destination_filename, int32_t interleave_mode, uint32_t near_lossless, uint32_t color_transformation)
 {
     portable_anymap_file anymap_file{source_filename};
 
@@ -173,11 +207,29 @@ void encode(const string_view source_filename, const string_view destination_fil
     jpegls_info.width = anymap_file.width();
     jpegls_info.height = anymap_file.height();
     jpegls_info.alphabet = 1U << anymap_file.bits_per_sample();
-    jpegls_info.scan[0].interleave = anymap_file.component_count() > 1 ? JPEGLS_Interleave::line : JPEGLS_Interleave::none;
+    jpegls_info.components = anymap_file.component_count();
     jpegls_info.scan[0].alphabet = jpegls_info.alphabet;
+    jpegls_info.scan[0].loss = near_lossless;
+    jpegls_info.scan[0].colorXForm = static_cast<JPEGLS_ColorXForm>(color_transformation);
+
+    if (interleave_mode == default_interleave_mode)
+    {
+        interleave_mode = anymap_file.component_count() > 1 ? static_cast<int32_t>(JPEGLS_Interleave::pixel) : static_cast<int32_t>(JPEGLS_Interleave::none);
+    }
+
+    jpegls_info.scan[0].interleave = static_cast<JPEGLS_Interleave>(interleave_mode);
+    if (jpegls_info.scan[0].interleave == JPEGLS_Interleave::none)
+    {
+        jpegls_info.scan[0].components = 1;
+    }
+    else 
+    {
+        jpegls_info.scan[0].components = anymap_file.component_count();
+    }
 
     destination_context_t destination_context(jpegls_info.width,
                                               jpegls_info.height, anymap_file.component_count(), anymap_file.bits_per_sample());
+
     codec.start_encode(destination_context_t::write_buffer_callback, &destination_context, jpegls_info);
 
     source_context_t source_context{anymap_file.image_data()};
@@ -189,8 +241,10 @@ void encode(const string_view source_filename, const string_view destination_fil
     save_file(destination_filename, destination_context.buffer());
 
     const double compression_ratio{static_cast<double>(anymap_file.image_data().size()) / destination_context.buffer().size()};
-    println("Info: original size = {}, encoded size = {}, compression ratio = {:.2f}:1, encode time = {:.4f} ms",
-            anymap_file.image_data().size(), destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count());
+    println("Info: original size = {:>10}, interleave mode = {}, near lossless = {}, color transformation = {}",
+            anymap_file.image_data().size(), interleave_mode, near_lossless, color_transformation);
+    println("      encoded size  = {:>10}, compression ratio = {:.2f}, encode time = {:.4f} ms ",
+            destination_context.buffer().size(), compression_ratio, duration<double, std::milli>(encode_duration).count());
 }
 
 void decode(const string_view source_filename, const string_view destination_filename)
@@ -238,54 +292,79 @@ void log_failure(const runtime_error& error) noexcept
     }
 }
 
-enum class command : std::uint8_t
-{
-    encode,
-    decode
-};
-
-std::expected<tuple<command, string, string>, string> parse_command_line(const int argc, const char* const argv[])
-{
-    if (argc < 4)
-        return unexpected("usage: hp-jpegls-tool <operation: encode | decode> <input-filename> <output-filename>\n");
-
-    if (argv[1] == "encode"s)
-        return tuple{command::encode, argv[2], argv[3]};
-
-    if (argv[1] == "decode"s)
-        return tuple{command::decode, argv[2], argv[3]};
-
-    return unexpected(format("Unknown operation: {}", argv[1]));
-}
-
 } // namespace
 
 
 int main(const int argc, const char* const argv[])
-try
 {
-    const auto request{parse_command_line(argc, argv)};
-    if (!request.has_value())
+    ArgumentParser program("hp-jpegls-tool");
+    program.add_description("HP JPEG-LS Tool");
+
+    ArgumentParser encode_command("encode");
+    encode_command.add_description("Encode a binary Netpbm file to a JPEG-LS file");
+    encode_command.add_argument(input_argument).help("The binary Netpbm file to encode to JPEG-LS (required)");
+    encode_command.add_argument(output_argument)
+        .nargs(0, 1)
+        .help("The output JPEG-LS file path. If not specified, the output file is created "
+              "with the same name as the input file and a .jls extension");
+    encode_command.add_argument(interleave_mode_argument)
+        .scan<'i', int32_t>()
+        .help("Interleave mode parameter (optional: default = 0 for 1 component, 2 for > 1 component)");
+    encode_command.add_argument(near_lossless_argument)
+        .scan<'u', uint32_t>()
+        .help("NEAR parameter (optional: default = 0)");
+    encode_command.add_argument(color_transform_argument)
+        .scan<'u', uint32_t>()
+        .help("Color transformation parameter (optional: default = 0)");
+
+    program.add_subparser(encode_command);
+
+    ArgumentParser decode_command("decode");
+    decode_command.add_description("Decode a JPEG-LS file to a binary Netpbm file");
+    decode_command.add_argument(input_argument).help("The JPEG-LS file to decode to a binary Netpbm file (required)");
+    decode_command.add_argument(output_argument)
+        .nargs(0, 1)
+        .help("The output Netpbm file path. If not specified, the output filename is based on the input filename");
+    program.add_subparser(decode_command);
+
+    try
     {
-        println("{}", request.error());
+        program.parse_args(argc, argv);
+
+        if (program.is_subcommand_used(encode_command))
+        {
+            const auto input_filename{encode_command.get<string>(input_argument)};
+            auto output_filename{encode_command.present<string>(output_argument)};
+            if (!output_filename.has_value())
+            {
+                output_filename = fs::path(input_filename).replace_extension(".jls").string();
+            }
+
+            encode(input_filename, *output_filename, get_interleave_mode_argument(encode_command),
+                get_near_lossless_argument(encode_command), get_color_transform_argument(encode_command));
+        }
+        else if (program.is_subcommand_used(decode_command))
+        {
+            const auto input_filename{decode_command.get<string>(input_argument)};
+            auto output_filename{decode_command.present<string>(output_argument)};
+            if (!output_filename.has_value())
+            {
+                output_filename = fs::path(input_filename).replace_extension(".pnm").string();
+            }
+
+            decode(input_filename, *output_filename);
+        }
+        else
+        {
+            println("{}", program.help().str());
+            return exit_failure;
+        }
+
+        return exit_success;
+    }
+    catch (const runtime_error& error)
+    {
+        log_failure(error);
         return exit_failure;
     }
-
-    switch (const auto& [command, source_filename, destination_filename]{request.value()}; command)
-    {
-    case command::encode:
-        encode(source_filename, destination_filename);
-        break;
-
-    case command::decode:
-        decode(source_filename, destination_filename);
-        break;
-    }
-
-    return exit_success;
-}
-catch (const runtime_error& error)
-{
-    log_failure(error);
-    return exit_failure;
 }
